@@ -100,7 +100,7 @@ public class DNSDataUpdate {
 
     // we call this function only if there NO answer
     // and if #authorities > 0
-    public HashMap<byte[], Integer> readAuthorities(byte[] buff, int numQues, int numAuth) {
+    public byte[] readAuthorities(byte[] buff, int numQues, int numAuth) {
         byte[] auth = new byte[4];
         int curPos = readQuestions(buff, numQues);
         int numAuthSaw = 1;
@@ -126,11 +126,11 @@ public class DNSDataUpdate {
             }
             numAuthSaw++;
         }
-        HashMap lastAuthAndPos = new
+        //HashMap lastAuthAndPos = new
         return auth; // might be empty, need to check if NOT all zeros
     }
 
-    public byte[] readAdditional(byte[] buff, int numQues, int numAuth, int numAdd) {
+    public void readAdditional(byte[] buff, int numQues, int numAuth, int numAdd) {
         byte[] add = new byte[4];
 
     }
