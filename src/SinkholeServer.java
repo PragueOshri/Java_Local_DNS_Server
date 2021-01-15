@@ -9,6 +9,7 @@ public class SinkholeServer {
     byte[] inValidAddress;
     String firstAuthority;
     final List<String> rootsDNS;
+    int counter;
 
     private List<String> initializeRootsList() {
         List<String> listOfRoots = new ArrayList<>();
@@ -45,11 +46,15 @@ public class SinkholeServer {
     protected DNSInformation receivedQuery() throws IOException {
         queryDNSPacket = new DNSInformation(localServerSocket, null, true);
         queryDNSPacket.receiver.receivedByteArray();
+        queryDNSPacket.headers = new Headers(queryDNSPacket.receiver.received);
+        System.out.println("-----> QUERY");
+        queryDNSPacket.headers.printHeaders();
         return queryDNSPacket;
     }
 
     protected void iterativeSearch() throws IOException {
         boolean found = false;
+        counter = 0;
         for (int i = 0; i < rootsDNS.size(); i++) {
             System.out.println("Trying RootDns " + i);
             if (checkDNS(InetAddress.getByName(rootsDNS.get(i)))) {
@@ -57,22 +62,30 @@ public class SinkholeServer {
                 break;
             }
         }
+//        System.out.println("counter = " + counter);
         if (!found) {
-//            if(!checkDNS(InetAddress.getByName(firstAuthority))) {
-//                System.out.println("---> Is Name Error <---");
-//                new SendDNSPacket(localServerSocket, queryDNSPacket.receiver.received, queryDNSPacket.receiver.packetLength,
-//                        queryDNSPacket.receiver.clientIP, true, queryDNSPacket.receiver.clientPort, true);
-//            }
-            checkDNS(InetAddress.getByName(firstAuthority));
+            counter = 0;
+            System.out.println("----------------------");
+            if(!checkDNS(InetAddress.getByName(firstAuthority))) {
+                System.out.println("---> Is Name Error <---");
+                new SendDNSPacket(localServerSocket, queryDNSPacket.receiver.received, queryDNSPacket.receiver.packetLength,
+                        queryDNSPacket.receiver.clientIP, true, queryDNSPacket.receiver.clientPort, true);
+            }
+//            checkDNS(InetAddress.getByName(firstAuthority));
         }
     }
 
     protected boolean checkDNS(InetAddress IP) throws IOException {
+        if (counter++ > 160) {
+            return false;
+        }
         DNSInformation dns = new DNSInformation(localServerSocket, IP, false);
         new SendDNSPacket(localServerSocket, queryDNSPacket.receiver.received,
                 queryDNSPacket.receiver.packetLength, IP, false,53, false);
         byte[] received = dns.receiver.receivedByteArray();
         Headers headers = new Headers(received);
+        System.out.println("-----> RESPOND");
+        headers.printHeaders();
         if (headers == null) {
             return false;
         }
@@ -125,6 +138,10 @@ public class SinkholeServer {
         HandleDNSData worker = new HandleDNSData(dns);
         for (int i = 0; i < numAdds; ++i) {
             pos = worker.readAdditional(buff, pos);
+            for ( Object key : dns.additionalNameIP.keySet() ) {
+                String add = (String)key;
+                System.out.println("additional name = " + add);
+            }
         }
         dns.position = pos;
     }
