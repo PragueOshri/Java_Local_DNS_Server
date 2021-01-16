@@ -7,6 +7,7 @@ public class HandleDNSData {
     DNSInformation curDNS;
 
     public HandleDNSData(DNSInformation dns) {
+
         curDNS = dns;
     }
 
@@ -106,8 +107,9 @@ public class HandleDNSData {
         curPos += 10; // 2 type + 2 class + 4 TTL + 2 RDATA length
         if (type == 1) {
             byte[] ip = Arrays.copyOfRange(buff, curPos, curPos + 4);
-            if (isAuth)
+            if (isAuth) {
                 curDNS.authoritiesNameIP.put(authNameWithIP.first, ip);
+            }
             else {
                 curDNS.additionalNameIP.put(authNameWithIP.first, ip);
             }

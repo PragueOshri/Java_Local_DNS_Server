@@ -24,8 +24,8 @@ public class SendDNSPacket {
     private void buildPacket(InetAddress IP, boolean isAns, boolean isNameErr) throws IOException {
         Headers headers = new Headers(message);
         if (isAns) {
-            System.out.println("Answer");
             headers.changeQRToOne();
+            headers.changeRDToOne();
             headers.changeAAToZero();
             headers.changeRAToOne();
             fillMessageFlags(headers);

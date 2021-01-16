@@ -11,9 +11,12 @@ public class SinkholeServer {
     final List<String> rootsDNS;
     int counter;
 
+    Scanner fileDomainNames;
+    Set<String> domainNameErrors = new HashSet<String>();
+    File domainNameErrorsFile;
+
     private List<String> initializeRootsList() {
         List<String> listOfRoots = new ArrayList<>();
-//        listOfRoots.add("82.80.196.156"); // <-----------------> an Israel Bezek DNS
         listOfRoots.add("198.41.0.4");
         listOfRoots.add("199.9.14.201");
         listOfRoots.add("192.33.4.12");
@@ -32,10 +35,30 @@ public class SinkholeServer {
 
     public SinkholeServer() throws IOException{
         rootsDNS = initializeRootsList();
+
+        domainNameErrorsFile = new File("src/blocklist.txt");
+        fileDomainNames = new Scanner(domainNameErrorsFile);
+        fillDomainNamesToBlock(fileDomainNames);
+
         inValidAddress = new byte[4]; // create byte[] of 0.0.0.0
+
         startListen();
         queryDNSPacket = receivedQuery();
-        iterativeSearch();
+        getQueryDomain();
+        if(inFileDomainNamesErr(queryDNSPacket.queryDomainName)){
+            new SendDNSPacket(localServerSocket, queryDNSPacket.receiver.received, queryDNSPacket.receiver.packetLength,
+                    queryDNSPacket.receiver.clientIP, true, queryDNSPacket.receiver.clientPort, true);
+        }
+        else {
+            iterativeSearch();
+        }
+    }
+
+    private void fillDomainNamesToBlock(Scanner s) {
+        while (s.hasNext()){
+            String lineName = s.nextLine();
+            domainNameErrors.add(lineName);
+        }
     }
 
     protected void startListen() throws IOException {
@@ -47,9 +70,19 @@ public class SinkholeServer {
         queryDNSPacket = new DNSInformation(localServerSocket, null, true);
         queryDNSPacket.receiver.receivedByteArray();
         queryDNSPacket.headers = new Headers(queryDNSPacket.receiver.received);
-        System.out.println("-----> QUERY");
-        queryDNSPacket.headers.printHeaders();
         return queryDNSPacket;
+    }
+
+    protected void getQueryDomain() {
+        HandleDNSData queryPacket = new HandleDNSData(queryDNSPacket);
+        queryDNSPacket.queryDomainName = queryPacket.readName(queryDNSPacket.receiver.received, 12).first;
+    }
+
+    protected boolean inFileDomainNamesErr(String domain) {
+        if (domainNameErrors.contains(domain)) {
+            return true;
+        }
+        return false;
     }
 
     protected void iterativeSearch() throws IOException {
@@ -62,21 +95,17 @@ public class SinkholeServer {
                 break;
             }
         }
-//        System.out.println("counter = " + counter);
         if (!found) {
             counter = 0;
-            System.out.println("----------------------");
             if(!checkDNS(InetAddress.getByName(firstAuthority))) {
-                System.out.println("---> Is Name Error <---");
                 new SendDNSPacket(localServerSocket, queryDNSPacket.receiver.received, queryDNSPacket.receiver.packetLength,
                         queryDNSPacket.receiver.clientIP, true, queryDNSPacket.receiver.clientPort, true);
             }
-//            checkDNS(InetAddress.getByName(firstAuthority));
         }
     }
 
     protected boolean checkDNS(InetAddress IP) throws IOException {
-        if (counter++ > 160) {
+        if (counter++ > 200) {
             return false;
         }
         DNSInformation dns = new DNSInformation(localServerSocket, IP, false);
@@ -84,8 +113,7 @@ public class SinkholeServer {
                 queryDNSPacket.receiver.packetLength, IP, false,53, false);
         byte[] received = dns.receiver.receivedByteArray();
         Headers headers = new Headers(received);
-        System.out.println("-----> RESPOND");
-        headers.printHeaders();
+//        headers.printHeaders();
         if (headers == null) {
             return false;
         }
@@ -95,10 +123,9 @@ public class SinkholeServer {
         dns.position = worker.readQuestions(received, headers.numQuestions, dns.position);
         if (headers.numAnswers > 0) { // ---> need to save the packet byte[] with the answer to send to client
             Tuple2 ans = worker.readAnswers(received, headers.numQuestions, headers.numAnswers, dns.position);
-            System.out.println("The client IP is = " + queryDNSPacket.receiver.clientIP.getHostAddress());
             new SendDNSPacket(localServerSocket, received, dns.receiver.packetLength,
                     queryDNSPacket.receiver.clientIP, true, queryDNSPacket.receiver.clientPort, false);
-            System.out.println("Found ANSWER");
+//            System.out.println("Found ANSWER");
             return true;
         }
         return handleAuthorities(dns, received, headers.numAuthorities, headers.numAdditionals);
@@ -108,6 +135,7 @@ public class SinkholeServer {
         readAuthorities(dns, buff, numAuths);
         readAdditionals(dns, buff, numAdds);
         pairAuthAdds(dns);
+
         Iterator i = dns.authoritiesNameIP.entrySet().iterator();
         while (i.hasNext()) {
             Map.Entry j = (Map.Entry) i.next();
@@ -124,7 +152,6 @@ public class SinkholeServer {
         for (int i = 0; i < numAuths; ++i) {
             pos = worker.readAuthority(buff, pos, true);
             if(i == 0) {
-                System.out.println("dns.authoritiesNameIP.size() = " + dns.authoritiesNameName.size());
                 for ( Object key : dns.authoritiesNameName.keySet() ) {
                     firstAuthority = (String)key;
                 }
@@ -138,15 +165,12 @@ public class SinkholeServer {
         HandleDNSData worker = new HandleDNSData(dns);
         for (int i = 0; i < numAdds; ++i) {
             pos = worker.readAdditional(buff, pos);
-            for ( Object key : dns.additionalNameIP.keySet() ) {
-                String add = (String)key;
-                System.out.println("additional name = " + add);
-            }
         }
         dns.position = pos;
     }
 
     protected void pairAuthAdds(DNSInformation dns) {
+
         Iterator i = dns.authoritiesNameName.entrySet().iterator();
         while (i.hasNext()) {
             Map.Entry j = (Map.Entry)i.next();
