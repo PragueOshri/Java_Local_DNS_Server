@@ -1,3 +1,5 @@
+package il.ac.idc.cs.sinkhole;
+
 public class Tuple2<K, V> {
     public K first;
     public V second;

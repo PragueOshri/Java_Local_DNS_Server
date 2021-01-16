@@ -1,3 +1,5 @@
+package il.ac.idc.cs.sinkhole;
+
 import java.util.*;
 import java.io.*;
 import java.nio.*;
@@ -74,8 +76,8 @@ public class HandleDNSData {
         int curPos = offset;
         int numQuesSaw = 0;
         while (numQuesSaw < numQues) {
-            Tuple2 queryNameAndPos = readName(buff, curPos);
-            curPos += (int)queryNameAndPos.second;
+            Tuple2<String, Integer> queryNameAndPos = readName(buff, curPos);
+            curPos += queryNameAndPos.second;
             curPos = curPos + 4; // where 2 bytes for type and another 2 bytes for class
             numQuesSaw++;
         }
@@ -86,22 +88,22 @@ public class HandleDNSData {
         byte[] ans = new byte[4];
         int curPos = offset;
         if (numAns > 0) {
-            Tuple2 ansNameAndPos = readName(buff, curPos);
-            curPos += (int)ansNameAndPos.second;
+            Tuple2<String, Integer> ansNameAndPos = readName(buff, curPos);
+            curPos += ansNameAndPos.second;
             curPos = curPos + 8; // 4 for type and class + 2 for TTL + 2 RDATA length
             ans = Arrays.copyOfRange(buff, curPos, curPos+4);
         }
         else {
             System.out.println("There no answers in this packet");
         }
-        Tuple2 ansByteArrayIPAndPos = new Tuple2(ans, curPos);
+        Tuple2<byte[], Integer> ansByteArrayIPAndPos = new Tuple2<>(ans, curPos);
         return ansByteArrayIPAndPos;
     }
 
     public int readAuthority(byte[] buff, int pos, boolean isAuth) {
         int curPos = pos;
-        Tuple2 authNameWithIP = readName(buff, curPos);
-        curPos += (int)authNameWithIP.second;
+        Tuple2<String, Integer> authNameWithIP = readName(buff, curPos);
+        curPos += authNameWithIP.second;
         ByteBuffer wrapped = ByteBuffer.wrap(buff);
         int type = wrapped.getShort(curPos);
         curPos += 10; // 2 type + 2 class + 4 TTL + 2 RDATA length
@@ -116,8 +118,8 @@ public class HandleDNSData {
             curPos += 4;
         }
         else {
-            Tuple2 authNameWithoutIP = readName(buff, curPos);
-            curPos += (int)authNameWithoutIP.second;
+            Tuple2<String, Integer> authNameWithoutIP = readName(buff, curPos);
+            curPos += authNameWithoutIP.second;
             if (isAuth) {
                 curDNS.authoritiesNameName.put(authNameWithoutIP.first, authNameWithoutIP.first);
             }
