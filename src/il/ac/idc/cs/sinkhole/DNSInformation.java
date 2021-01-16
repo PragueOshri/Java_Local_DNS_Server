@@ -19,7 +19,7 @@ public class DNSInformation {
     public HashMap<String, byte[]> additionalNameIP;
     public HashMap<String, String> authoritiesNameName;
 
-    public DNSInformation(DatagramSocket serverSocket, InetAddress IP, boolean isClient) throws IOException {
+    public DNSInformation(DatagramSocket serverSocket, InetAddress IP, boolean isClient) {
         receiver = new ReceiveDNSPacket(serverSocket, isClient);
         position = 0;
         authoritiesNameIP = new HashMap<>();

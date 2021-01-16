@@ -7,27 +7,30 @@ import java.net.InetAddress;
 
 public class ReceiveDNSPacket {
 
-    public InetAddress clientIP;
-    DatagramSocket socket;
-    DatagramPacket packet;
-    public byte[] received;
-    public int packetLength;
-    boolean isClient;
+    InetAddress clientIP;
+    private DatagramSocket socket;
+    byte[] received;
+    int packetLength;
+    private boolean isClient;
     int clientPort;
 
-    public ReceiveDNSPacket(DatagramSocket serverSocket, boolean isClient) throws IOException {
+    public ReceiveDNSPacket(DatagramSocket serverSocket, boolean isClient) {
         socket = serverSocket;
         received = new byte[64 * 1024];
         this.isClient = isClient;
     }
 
-    public byte[] receivedByteArray() throws IOException {
-        packet = new DatagramPacket(received, received.length);
-        socket.receive(packet);
-        packetLength = packet.getLength();
-        if (isClient) {
-            clientIP = packet.getAddress();
-            clientPort = packet.getPort();
+    byte[] receivedByteArray() {
+        try {
+            DatagramPacket packet = new DatagramPacket(received, received.length);
+            socket.receive(packet);
+            packetLength = packet.getLength();
+            if (isClient) {
+                clientIP = packet.getAddress();
+                clientPort = packet.getPort();
+            }
+        } catch (IOException e) {
+            System.err.println("Failed to received packet");
         }
         return received;
     }

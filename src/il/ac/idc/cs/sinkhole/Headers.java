@@ -4,20 +4,20 @@ import java.nio.*;
 
 public class Headers {
 
-    public short ID;
-    public short flags;
-    public short numQuestions;
-    public short numAnswers;
-    public short numAuthorities;
-    public short numAdditionals;
+    short ID;
+    short flags;
+    short numQuestions;
+    short numAnswers;
+    short numAuthorities;
+    short numAdditionals;
 
-    static final short QR_BIT = (short) 0x8000;
-    static final short AA_BIT = (short) 0x0400;
-    static final short RD_BIT = (short) 0x0100;
-    static final short RA_BIT = (short) 0x0080;
-    static final short RCODE_MASK = (short) 0x000F;
+    private static final short QR_BIT = (short) 0x8000;
+    private static final short AA_BIT = (short) 0x0400;
+    private static final short RD_BIT = (short) 0x0100;
+    private static final short RA_BIT = (short) 0x0080;
+    private static final short RCODE_MASK = (short) 0x000F;
 
-    public Headers(byte[] buff) {
+    Headers(byte[] buff) {
         parseHeader(buff);
     }
 
@@ -31,45 +31,41 @@ public class Headers {
         numAdditionals = wrapped.getShort(10);
     }
 
-    public void changeQRToOne() {
-        flags = (short)(flags | QR_BIT);
+    void changeQRToOne() {
+        flags = (short) (flags | QR_BIT);
     }
 
-    public void changeAAToZero() {
-        flags = (short)((flags & 0xffff) & ~AA_BIT);
+    void changeAAToZero() {
+        flags = (short) ((flags & 0xffff) & ~AA_BIT);
     }
 
-    public boolean isAAEqualOne() {
-        boolean f = ((flags & 0xffff) & AA_BIT) != 0;
-        return f;
+    void changeRAToOne() {
+        flags = (short) ((flags & 0xffff) | RA_BIT);
     }
 
-    public void changeRAToOne() {
-        flags = (short)((flags & 0xffff) | RA_BIT);
+    void changeRDToZero() {
+        flags = (short) ((flags & 0xffff) & ~RD_BIT);
     }
 
-    public void changeRDToZero() {
-        flags = (short)((flags & 0xffff) & ~RD_BIT);
+    void changeRDToOne() {
+        flags = (short) (((flags & 0xffff) & ~RD_BIT) | RD_BIT);
     }
 
-    public void changeRDToOne() {
-        flags = (short)(((flags & 0xffff) & ~RD_BIT) | RD_BIT);
+    void changeRcodeToThree() {
+        flags = (short) (((flags & 0xffff) & (~RCODE_MASK)) | 3);
     }
 
-    public void changeRcodeToThree() {
-        flags = (short)(((flags & 0xffff) & (~RCODE_MASK)) | 3);
-    }
-
+    // For debugging
     public void printHeaders() {
-        System.out.println("my headers are: \n" +
+        System.out.println("Headers: \n" +
                 "xID=" + ID + "\n" +
                 "flags=" + flags + "\n" +
                 "numQuestions=" + numQuestions + "\n" +
                 "numAnswers=" + numAnswers + "\n" +
                 "numAuthorities=" + numAuthorities + "\n" +
                 "numAdditionals=" + numAdditionals + "\n" +
-                "The AA bit is = " + (short)((flags & AA_BIT) == 0 ? 0 : 1) + "\n" +
-                "The QR bit is = " + ((short)(flags & QR_BIT) == 0 ? 0 : 1));
+                "The AA bit is = " + (short) ((flags & AA_BIT) == 0 ? 0 : 1) + "\n" +
+                "The QR bit is = " + ((short) (flags & QR_BIT) == 0 ? 0 : 1));
 
 
     }

@@ -6,17 +6,18 @@ import java.io.*;
 
 public class SinkholeServer {
 
-    DatagramSocket localServerSocket;
-    DNSInformation queryDNSPacket;
-    byte[] inValidAddress;
-    String firstAuthority;
-    final List<String> rootsDNS;
-    int counter;
+    static final int PORT = 5300;
 
-    static String pathFileDomainNameErr;
-    Scanner fileDomainNames;
-    Set<String> domainNameErrors = new HashSet<String>();
-    File domainNameErrorsFile;
+    private DatagramSocket localServerSocket;
+    private DNSInformation queryDNSPacket;
+    private byte[] inValidAddress;
+    private String firstAuthority;
+    private final List<String> rootsDNS;
+    private int counter;
+
+    private static String pathFileDomainNameErr;
+    private Set<String> domainNameErrors = new HashSet<>();
+    private File domainNameErrorsFile;
 
     private List<String> initializeRootsList() {
         List<String> listOfRoots = new ArrayList<>();
@@ -36,7 +37,7 @@ public class SinkholeServer {
         return listOfRoots;
     }
 
-    public SinkholeServer() throws IOException {
+    public SinkholeServer() {
         rootsDNS = initializeRootsList();
 
         inValidAddress = new byte[4]; // create byte[] of 0.0.0.0
@@ -44,18 +45,27 @@ public class SinkholeServer {
         startListen();
         queryDNSPacket = receivedQuery();
         getQueryDomain();
-        if (hasPathOfFile()) {
-            fileDomainNames = new Scanner(domainNameErrorsFile);
-            fillDomainNamesToBlock(fileDomainNames);
-            if (inFileDomainNamesErr(queryDNSPacket.queryDomainName)) {
-                new SendDNSPacket(localServerSocket, queryDNSPacket.receiver.received, queryDNSPacket.receiver.packetLength,
-                        queryDNSPacket.receiver.clientIP, true, queryDNSPacket.receiver.clientPort, true);
-            }
-            else {
-                iterativeSearch();
-            }
+
+        if (searchInInputFile()) {
+            new SendDNSPacket(localServerSocket, queryDNSPacket.receiver.received, queryDNSPacket.receiver.packetLength,
+                    queryDNSPacket.receiver.clientIP, true, queryDNSPacket.receiver.clientPort, true);
         } else {
             iterativeSearch();
+        }
+    }
+
+    private boolean searchInInputFile() {
+        if (hasPathOfFile()) {
+            Scanner fileDomainNames = null;
+            try {
+                fileDomainNames = new Scanner(domainNameErrorsFile);
+            } catch (FileNotFoundException e) {
+//                todo: handle exception
+            }
+            fillDomainNamesToBlock(fileDomainNames);
+            return inFileDomainNamesErr(queryDNSPacket.queryDomainName);
+        } else {
+            return false;
         }
     }
 
@@ -66,24 +76,29 @@ public class SinkholeServer {
         }
     }
 
-    protected void startListen() throws IOException {
-        localServerSocket = new DatagramSocket(5300);
-        System.out.println("Start listening under port 5300");
+    private void startListen() {
+        try {
+            localServerSocket = new DatagramSocket(PORT);
+            System.out.println("Start listening under port " + PORT);
+        } catch (SocketException e) {
+            System.err.println("Failed to listen on port " + PORT);
+        }
+
     }
 
-    protected DNSInformation receivedQuery() throws IOException {
+    private DNSInformation receivedQuery() {
         queryDNSPacket = new DNSInformation(localServerSocket, null, true);
         queryDNSPacket.receiver.receivedByteArray();
         queryDNSPacket.headers = new Headers(queryDNSPacket.receiver.received);
         return queryDNSPacket;
     }
 
-    protected void getQueryDomain() {
+    private void getQueryDomain() {
         HandleDNSData queryPacket = new HandleDNSData(queryDNSPacket);
         queryDNSPacket.queryDomainName = queryPacket.readName(queryDNSPacket.receiver.received, 12).first;
     }
 
-    protected boolean hasPathOfFile() {
+    private boolean hasPathOfFile() {
         if (pathFileDomainNameErr != null) {
             domainNameErrorsFile = new File(pathFileDomainNameErr);
             return true;
@@ -91,33 +106,34 @@ public class SinkholeServer {
         return false;
     }
 
-    protected boolean inFileDomainNamesErr(String domain) {
-        if (domainNameErrors.contains(domain)) {
-            return true;
-        }
-        return false;
+    private boolean inFileDomainNamesErr(String domain) {
+        return domainNameErrors.contains(domain);
     }
 
-    protected void iterativeSearch() throws IOException {
+    private void iterativeSearch() {
         boolean found = false;
         counter = 0;
-        for (int i = 0; i < rootsDNS.size(); i++) {
-            System.out.println("Trying RootDns " + i);
-            if (checkDNS(InetAddress.getByName(rootsDNS.get(i)))) {
-                found = true;
-                break;
+        try {
+            for (String curRootDNS : rootsDNS) {
+                if (checkDNS(InetAddress.getByName(curRootDNS))) {
+                    found = true;
+                    break;
+                }
             }
-        }
-        if (!found) {
-            counter = 0;
-            if (!checkDNS(InetAddress.getByName(firstAuthority))) {
-                new SendDNSPacket(localServerSocket, queryDNSPacket.receiver.received, queryDNSPacket.receiver.packetLength,
-                        queryDNSPacket.receiver.clientIP, true, queryDNSPacket.receiver.clientPort, true);
+            if (!found) {
+                counter = 0;
+                if (!checkDNS(InetAddress.getByName(firstAuthority))) {
+                    new SendDNSPacket(localServerSocket, queryDNSPacket.receiver.received, queryDNSPacket.receiver.packetLength,
+                            queryDNSPacket.receiver.clientIP, true, queryDNSPacket.receiver.clientPort, true);
+                }
             }
+        } catch (UnknownHostException e) {
+//            todo: handle host exception
         }
+
     }
 
-    protected boolean checkDNS(InetAddress IP) throws IOException {
+    private boolean checkDNS(InetAddress IP) {
         if (counter++ > 200) {
             return false;
         }
@@ -126,40 +142,36 @@ public class SinkholeServer {
                 queryDNSPacket.receiver.packetLength, IP, false, 53, false);
         byte[] received = dns.receiver.receivedByteArray();
         Headers headers = new Headers(received);
-//        headers.printHeaders();
-        if (headers == null) {
-            return false;
-        }
         dns.headers = headers;
         dns.position = 12;
         HandleDNSData worker = new HandleDNSData(dns);
         dns.position = worker.readQuestions(received, headers.numQuestions, dns.position);
         if (headers.numAnswers > 0) { // ---> need to save the packet byte[] with the answer to send to client
-            Tuple2<byte[], Integer> ans = worker.readAnswers(received, headers.numQuestions, headers.numAnswers, dns.position);
             new SendDNSPacket(localServerSocket, received, dns.receiver.packetLength,
                     queryDNSPacket.receiver.clientIP, true, queryDNSPacket.receiver.clientPort, false);
-//            System.out.println("Found ANSWER");
             return true;
         }
         return handleAuthorities(dns, received, headers.numAuthorities, headers.numAdditionals);
     }
 
-    protected boolean handleAuthorities(DNSInformation dns, byte[] buff, int numAuths, int numAdds) throws IOException {
+    private boolean handleAuthorities(DNSInformation dns, byte[] buff, int numAuths, int numAdds) {
         readAuthorities(dns, buff, numAuths);
         readAdditionals(dns, buff, numAdds);
         pairAuthAdds(dns);
 
-        Iterator<Map.Entry<String, byte[]>> i = dns.authoritiesNameIP.entrySet().iterator();
-        while (i.hasNext()) {
-            Map.Entry<String, byte[]> j = i.next();
-            if (checkDNS(InetAddress.getByAddress(j.getValue()))) {
-                return true;
+        for (Map.Entry<String, byte[]> j : dns.authoritiesNameIP.entrySet()) {
+            try {
+                if (checkDNS(InetAddress.getByAddress(j.getValue()))) {
+                    return true;
+                }
+            } catch (UnknownHostException e) {
+//                todo: handle host exception
             }
         }
         return false;
     }
 
-    protected void readAuthorities(DNSInformation dns, byte[] buff, int numAuths) throws IOException {
+    private void readAuthorities(DNSInformation dns, byte[] buff, int numAuths) {
         int pos = dns.position;
         HandleDNSData worker = new HandleDNSData(dns);
         for (int i = 0; i < numAuths; ++i) {
@@ -173,7 +185,7 @@ public class SinkholeServer {
         dns.position = pos;
     }
 
-    protected void readAdditionals(DNSInformation dns, byte[] buff, int numAdds) throws IOException {
+    private void readAdditionals(DNSInformation dns, byte[] buff, int numAdds) {
         int pos = dns.position;
         HandleDNSData worker = new HandleDNSData(dns);
         for (int i = 0; i < numAdds; ++i) {
@@ -182,23 +194,16 @@ public class SinkholeServer {
         dns.position = pos;
     }
 
-    protected void pairAuthAdds(DNSInformation dns) {
-
-        Iterator<Map.Entry<String, String>> i = dns.authoritiesNameName.entrySet().iterator();
-        while (i.hasNext()) {
-            Map.Entry<String, String> j = i.next();
-            try {
-                byte[] ip = dns.additionalNameIP.get(j.getValue());
-                if (ip != null && !ip.equals(inValidAddress)) {
-                    dns.authoritiesNameIP.put(j.getValue(), ip);
-                }
-            } catch (Exception e) {
-                System.out.println("pairAuthAdds: exception " + j.getValue());
+    private void pairAuthAdds(DNSInformation dns) {
+        for (Map.Entry<String, String> j : dns.authoritiesNameName.entrySet()) {
+            byte[] ip = dns.additionalNameIP.get(j.getValue());
+            if (ip != null && !Arrays.equals(ip, inValidAddress)) {
+                dns.authoritiesNameIP.put(j.getValue(), ip);
             }
         }
     }
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) {
         if (args.length > 0) {
             pathFileDomainNameErr = args[0];
         }

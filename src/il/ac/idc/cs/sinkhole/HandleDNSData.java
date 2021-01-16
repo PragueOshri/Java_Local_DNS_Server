@@ -1,25 +1,24 @@
 package il.ac.idc.cs.sinkhole;
 
 import java.util.*;
-import java.io.*;
 import java.nio.*;
 
-public class HandleDNSData {
+class HandleDNSData {
 
-    DNSInformation curDNS;
+    private DNSInformation curDNS;
 
-    public HandleDNSData(DNSInformation dns) {
+    HandleDNSData(DNSInformation dns) {
 
         curDNS = dns;
     }
 
     /**
-     Get: byte[] of the received packet and offset to start to read in this packet
-     Translate from the packet the name (of a query / DNS server - authority)
-     Return: Tuple2<String, Integer> - String holds the name and
-             the Integer holds the number of cells we need to jump to continue after the name
+     * Get: byte[] of the received packet and offset to start to read in this packet
+     * Translate from the packet the name (of a query / DNS server - authority)
+     * Return: Tuple2<String, Integer> - String holds the name and
+     * the Integer holds the number of cells we need to jump to continue after the name
      */
-    public Tuple2<String, Integer> readName(byte[] buff, int offset) {
+    PairTuple<String, Integer> readName(byte[] buff, int offset) {
         byte[] name = new byte[256];
         int index = 0;
         int numCellsToJump = 1;
@@ -31,8 +30,7 @@ public class HandleDNSData {
                 int pointerOffset = (((buff[offset] & 0xff) * 256) + (buff[offset + 1] & 0xff) - 49152);
                 offset = pointerOffset - 1;
                 isPointer = true;
-            }
-            else {
+            } else {
                 name[index++] = buff[offset];
             }
             ++offset;
@@ -65,18 +63,18 @@ public class HandleDNSData {
         }
         if (i > 0)
             name[i - 1] = '\0';
-        String resultName = "";
+        StringBuilder resultName = new StringBuilder();
         i = 0;
         while (name[i] != '\0')
-            resultName += (char)name[i++];
-        return new Tuple2<>(resultName, numCellsToJump);
+            resultName.append((char) name[i++]);
+        return new PairTuple<>(resultName.toString(), numCellsToJump);
     }
 
-    public int readQuestions(byte[] buff, int numQues, int offset) {
+    int readQuestions(byte[] buff, int numQues, int offset) {
         int curPos = offset;
         int numQuesSaw = 0;
         while (numQuesSaw < numQues) {
-            Tuple2<String, Integer> queryNameAndPos = readName(buff, curPos);
+            PairTuple<String, Integer> queryNameAndPos = readName(buff, curPos);
             curPos += queryNameAndPos.second;
             curPos = curPos + 4; // where 2 bytes for type and another 2 bytes for class
             numQuesSaw++;
@@ -84,25 +82,9 @@ public class HandleDNSData {
         return curPos;
     }
 
-    public Tuple2<byte[], Integer> readAnswers(byte[] buff, int numQues, int numAns, int offset) {
-        byte[] ans = new byte[4];
-        int curPos = offset;
-        if (numAns > 0) {
-            Tuple2<String, Integer> ansNameAndPos = readName(buff, curPos);
-            curPos += ansNameAndPos.second;
-            curPos = curPos + 8; // 4 for type and class + 2 for TTL + 2 RDATA length
-            ans = Arrays.copyOfRange(buff, curPos, curPos+4);
-        }
-        else {
-            System.out.println("There no answers in this packet");
-        }
-        Tuple2<byte[], Integer> ansByteArrayIPAndPos = new Tuple2<>(ans, curPos);
-        return ansByteArrayIPAndPos;
-    }
-
-    public int readAuthority(byte[] buff, int pos, boolean isAuth) {
+    int readAuthority(byte[] buff, int pos, boolean isAuth) {
         int curPos = pos;
-        Tuple2<String, Integer> authNameWithIP = readName(buff, curPos);
+        PairTuple<String, Integer> authNameWithIP = readName(buff, curPos);
         curPos += authNameWithIP.second;
         ByteBuffer wrapped = ByteBuffer.wrap(buff);
         int type = wrapped.getShort(curPos);
@@ -111,14 +93,12 @@ public class HandleDNSData {
             byte[] ip = Arrays.copyOfRange(buff, curPos, curPos + 4);
             if (isAuth) {
                 curDNS.authoritiesNameIP.put(authNameWithIP.first, ip);
-            }
-            else {
+            } else {
                 curDNS.additionalNameIP.put(authNameWithIP.first, ip);
             }
             curPos += 4;
-        }
-        else {
-            Tuple2<String, Integer> authNameWithoutIP = readName(buff, curPos);
+        } else {
+            PairTuple<String, Integer> authNameWithoutIP = readName(buff, curPos);
             curPos += authNameWithoutIP.second;
             if (isAuth) {
                 curDNS.authoritiesNameName.put(authNameWithoutIP.first, authNameWithoutIP.first);
@@ -127,7 +107,7 @@ public class HandleDNSData {
         return curPos;
     }
 
-    public int readAdditional(byte[] buff, int pos) throws IOException {
+    int readAdditional(byte[] buff, int pos) {
         return readAuthority(buff, pos, false);
     }
 }

@@ -9,21 +9,24 @@ import java.util.Arrays;
 
 public class SendDNSPacket {
 
-    DatagramSocket serverSocket;
-    DatagramPacket packet;
-    byte[] message;
-    int port;
+    private DatagramPacket packet;
+    private byte[] message;
+    private int port;
 
     public SendDNSPacket(DatagramSocket socket, byte[] buff, int length,
-                         InetAddress IP, boolean isAns, int port, boolean isNameErr) throws IOException {
-        serverSocket = socket;
+                         InetAddress IP, boolean isAns, int port, boolean isNameErr) {
+        DatagramSocket serverSocket = socket;
         this.port = port;
         message = Arrays.copyOf(buff, length);
         buildPacket(IP, isAns, isNameErr);
-        serverSocket.send(packet);
+        try {
+            serverSocket.send(packet);
+        } catch (IOException e) {
+//            todo: handle exception
+        }
     }
 
-    private void buildPacket(InetAddress IP, boolean isAns, boolean isNameErr) throws IOException {
+    private void buildPacket(InetAddress IP, boolean isAns, boolean isNameErr) {
         Headers headers = new Headers(message);
         if (isAns) {
             headers.changeQRToOne();
@@ -31,8 +34,7 @@ public class SendDNSPacket {
             headers.changeAAToZero();
             headers.changeRAToOne();
             fillMessageFlags(headers);
-        }
-        else {
+        } else {
             headers.changeRDToZero();
             fillMessageFlags(headers);
         }
@@ -40,20 +42,13 @@ public class SendDNSPacket {
             headers.changeRcodeToThree();
             fillMessageFlags(headers);
         }
-        //fillMessage(buff, length);
         packet = new DatagramPacket(message, message.length, IP, port);
     }
 
     private void fillMessageFlags(Headers header) {
         ByteBuffer wrapper = ByteBuffer.wrap(message);
-        wrapper.putShort(0,header.ID);
-        wrapper.putShort(2,header.flags);
+        wrapper.putShort(0, header.ID);
+        wrapper.putShort(2, header.flags);
     }
-/*
-    private void fillMessage(byte[] buff, int length) {
-        ByteBuffer wrapper = ByteBuffer.wrap(message);
-        wrapper.put(buff, 4, length - 4);
 
-    }
-*/
 }
